@@ -5,34 +5,32 @@
  * @package WordPress
  */
 
-if ( ! function_exists( 'gutenberg_draft_or_post_title' ) ) {
-	/**
-	 * Get the post title.
-	 *
-	 * The post title is fetched and if it is blank then a default string is
-	 * returned.
-	 *
-	 * Copied from `wp-admin/includes/template.php`, but we can't include that
-	 * file because:
-	 *
-	 * 1. It causes bugs with test fixture generation and strange Docker 255 error
-	 *    codes.
-	 * 2. It's in the admin; ideally we *shouldn't* be including files from the
-	 *    admin for a block's output. It's a very small/simple function as well,
-	 *    so duplicating it isn't too terrible.
-	 *
-	 * @since 3.3.0
-	 *
-	 * @param int|WP_Post $post Optional. Post ID or WP_Post object. Default is global $post.
-	 * @return string The post title if set; "(no title)" if no title is set.
-	 */
-	function gutenberg_draft_or_post_title( $post = 0 ) {
-		$title = get_the_title( $post );
-		if ( empty( $title ) ) {
-			$title = __( '(no title)' );
-		}
-		return esc_html( $title );
+/**
+ * Get the post title.
+ *
+ * The post title is fetched and if it is blank then a default string is
+ * returned.
+ *
+ * Copied from `wp-admin/includes/template.php`, but we can't include that
+ * file because:
+ *
+ * 1. It causes bugs with test fixture generation and strange Docker 255 error
+ *    codes.
+ * 2. It's in the admin; ideally we *shouldn't* be including files from the
+ *    admin for a block's output. It's a very small/simple function as well,
+ *    so duplicating it isn't too terrible.
+ *
+ * @since 3.3.0
+ *
+ * @param int|WP_Post $post Optional. Post ID or WP_Post object. Default is global $post.
+ * @return string The post title if set; "(no title)" if no title is set.
+ */
+function wp_latest_comments_draft_or_post_title( $post = 0 ) {
+	$title = get_the_title( $post );
+	if ( empty( $title ) ) {
+		$title = __( '(no title)' );
 	}
+	return esc_html( $title );
 }
 
 /**
@@ -42,9 +40,9 @@ if ( ! function_exists( 'gutenberg_draft_or_post_title' ) ) {
  *
  * @return string Returns the post content with latest comments added.
  */
-function gutenberg_render_block_core_latest_comments( $attributes = array() ) {
-	// This filter is documented in wp-includes/widgets/class-wp-widget-recent-comments.php.
+function render_block_core_latest_comments( $attributes = array() ) {
 	$comments = get_comments(
+		// This filter is documented in wp-includes/widgets/class-wp-widget-recent-comments.php.
 		apply_filters(
 			'widget_comments_args',
 			array(
@@ -94,7 +92,7 @@ function gutenberg_render_block_core_latest_comments( $attributes = array() ) {
 
 			// `_draft_or_post_title` calls `esc_html()` so we don't need to wrap that call in
 			// `esc_html`.
-			$post_title = '<a class="wp-block-latest-comments__comment-link" href="' . esc_url( get_comment_link( $comment ) ) . '">' . gutenberg_draft_or_post_title( $comment->comment_post_ID ) . '</a>';
+			$post_title = '<a class="wp-block-latest-comments__comment-link" href="' . esc_url( get_comment_link( $comment ) ) . '">' . wp_latest_comments_draft_or_post_title( $comment->comment_post_ID ) . '</a>';
 
 			$list_items_markup .= sprintf(
 				/* translators: 1: author name (inside <a> or <span> tag, based on if they have a URL), 2: post title related to this comment */
@@ -118,67 +116,42 @@ function gutenberg_render_block_core_latest_comments( $attributes = array() ) {
 		}
 	}
 
-	$class = 'wp-block-latest-comments';
-	if ( isset( $attributes['align'] ) ) {
-		$class .= " align{$attributes['align']}";
-	}
+	$classnames = array();
 	if ( $attributes['displayAvatar'] ) {
-		$class .= ' has-avatars';
+		$classnames[] = 'has-avatars';
 	}
 	if ( $attributes['displayDate'] ) {
-		$class .= ' has-dates';
+		$classnames[] = 'has-dates';
 	}
 	if ( $attributes['displayExcerpt'] ) {
-		$class .= ' has-excerpts';
+		$classnames[] = 'has-excerpts';
 	}
 	if ( empty( $comments ) ) {
-		$class .= ' no-comments';
+		$classnames[] = 'no-comments';
 	}
-	$classnames = esc_attr( $class );
+	$wrapper_attributes = get_block_wrapper_attributes( array( 'class' => implode( ' ', $classnames ) ) );
 
-	$block_content = ! empty( $comments ) ? sprintf(
-		'<ol class="%1$s">%2$s</ol>',
-		$classnames,
+	return ! empty( $comments ) ? sprintf(
+		'<ol %1$s>%2$s</ol>',
+		$wrapper_attributes,
 		$list_items_markup
 	) : sprintf(
-		'<div class="%1$s">%2$s</div>',
-		$classnames,
+		'<div %1$s>%2$s</div>',
+		$wrapper_attributes,
 		__( 'No comments to show.' )
 	);
-
-	return $block_content;
 }
 
-register_block_type(
-	'core/latest-comments',
-	array(
-		'attributes'      => array(
-			'className'      => array(
-				'type' => 'string',
-			),
-			'commentsToShow' => array(
-				'type'    => 'number',
-				'default' => 5,
-				'minimum' => 1,
-				'maximum' => 100,
-			),
-			'displayAvatar'  => array(
-				'type'    => 'boolean',
-				'default' => true,
-			),
-			'displayDate'    => array(
-				'type'    => 'boolean',
-				'default' => true,
-			),
-			'displayExcerpt' => array(
-				'type'    => 'boolean',
-				'default' => true,
-			),
-			'align'          => array(
-				'type' => 'string',
-				'enum' => array( 'center', 'left', 'right', 'wide', 'full', '' ),
-			),
-		),
-		'render_callback' => 'gutenberg_render_block_core_latest_comments',
-	)
-);
+/**
+ * Registers the `core/latest-comments` block.
+ */
+function register_block_core_latest_comments() {
+	register_block_type_from_metadata(
+		__DIR__ . '/latest-comments',
+		array(
+			'render_callback' => 'render_block_core_latest_comments',
+		)
+	);
+}
+
+add_action( 'init', 'register_block_core_latest_comments' );
